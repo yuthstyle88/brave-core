@@ -552,6 +552,10 @@ inline constexpr webui::LocalizedString kLocalizedStrings[] = {
      IDS_BRAVE_WALLET_CREATE_ACCOUNT_ZCASH_DESCRIPTION},
     {"braveWalletCreateAccountZCashTestnetDescription",
      IDS_BRAVE_WALLET_CREATE_ACCOUNT_ZCASH_TESTNET_DESCRIPTION},
+    {"braveWalletCreateAccountCardanoDescription",
+     IDS_BRAVE_WALLET_CREATE_ACCOUNT_CARDANO_DESCRIPTION},
+    {"braveWalletCreateAccountCardanoTestnetDescription",
+     IDS_BRAVE_WALLET_CREATE_ACCOUNT_CARDANO_TESTNET_DESCRIPTION},
     {"braveWalletFilecoinPrivateKeyProtocol",
      IDS_BRAVE_WALLET_FILECOIN_PRIVATE_KEY_PROTOCOL},
     {"braveWalletAddAccountImport", IDS_BRAVE_WALLET_ADD_ACCOUNT_IMPORT},
@@ -1166,6 +1170,10 @@ inline constexpr webui::LocalizedString kLocalizedStrings[] = {
      IDS_BRAVE_WALLET_ZEC_ACCOUNT_DESCRIPTION},
     {"braveWalletZECTestnetAccountDescription",
      IDS_BRAVE_WALLET_ZEC_TESTNET_ACCOUNT_DESCRIPTION},
+    {"braveWalletCardanoAccountDescription",
+     IDS_BRAVE_WALLET_CARDANO_ACCOUNT_DESCRIPTION},
+    {"braveWalletCardanoTestnetAccountDescription",
+     IDS_BRAVE_WALLET_CARDANO_TESTNET_ACCOUNT_DESCRIPTION},
     {"braveWalletShowNetworkLogoOnNftsTitle",
      IDS_BRAVE_WALLET_SHOW_NETWORK_LOGO_ON_NFTS_TITLE},
     {"braveWalletShowNetworkLogoOnNftsDescription",
@@ -1204,6 +1212,9 @@ inline constexpr webui::LocalizedString kLocalizedStrings[] = {
      IDS_BRAVE_WALLET_SWAPPING_OR_BRIDGING_ON_NETWORK},
     {"braveWalletErrorAttemptingToTransactOnNetwork",
      IDS_BRAVE_WALLET_ERROR_ATTEMPTING_TO_TRANSACT_ON_NETWORK},
+    {"braveWalletShieldingAmount", IDS_BRAVE_WALLET_SHIELDING_AMOUNT},
+    {"braveWalletAmountHasBeenShielded",
+     IDS_BRAVE_WALLET_AMOUNT_HAS_BEEN_SHIELDED},
     {"braveWalletTransactionSubmittedTitle",
      IDS_BRAVE_WALLET_TRANSACTION_SUBMITTED_TITLE},
     {"braveWalletTransactionSignedTitle",
@@ -1635,6 +1646,8 @@ inline constexpr webui::LocalizedString kLocalizedStrings[] = {
      IDS_BRAVE_WALLET_OUT_OF_SYNC_BLOCKS_BEHIND_TITLE},
     {"braveWalletOutOfSyncDescription",
      IDS_BRAVE_WALLET_OUT_OF_SYNC_DESCRIPTION},
+    {"braveWalletZCashPendingBalanceTitle",
+     IDS_BRAVE_WALLET_ZCASH_PENDING_BALANCE_TITLE},
     {"braveWalletSyncAccountButton", IDS_BRAVE_WALLET_SYNC_ACCOUNT_BUTTON},
     {"braveWalletSyncAccountName", IDS_BRAVE_WALLET_SYNC_ACCOUNT_NAME},
     {"braveWalletInitializing", IDS_BRAVE_WALLET_INITIALIZING},
@@ -1654,7 +1667,10 @@ inline constexpr webui::LocalizedString kLocalizedStrings[] = {
      IDS_BRAVE_WALLET_ACCOUNT_BIRTHDAY_TOO_HIGH},
     {"braveWalletBlocksBehind", IDS_BRAVE_WALLET_BLOCKS_BEHIND},
     {"braveWalletAccountIsSyncing", IDS_BRAVE_WALLET_ACCOUNT_IS_SYNCING},
-    {"braveWalletSyncing", IDS_BRAVE_WALLET_SYNCING}};
+    {"braveWalletSyncing", IDS_BRAVE_WALLET_SYNCING},
+    {"braveWalletReviewShield", IDS_BRAVE_WALLET_REVIEW_SHIELD},
+    {"braveWalletShielding", IDS_BRAVE_WALLET_SHIELDING},
+    {"braveWalletShieldZEC", IDS_BRAVE_WALLET_SHIELD_ZEC}};
 
 // 0x swap constants
 inline constexpr char kZeroExBaseAPIURL[] = "https://api.0x.wallet.brave.com";

@@ -29,6 +29,7 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/types/expected.h"
 #include "brave/components/ai_chat/core/browser/ai_chat_credential_manager.h"
+#include "brave/components/ai_chat/core/browser/ai_chat_metrics.h"
 #include "brave/components/ai_chat/core/browser/engine/engine_consumer.h"
 #include "brave/components/ai_chat/core/browser/model_service.h"
 #include "brave/components/ai_chat/core/browser/text_embedder.h"
@@ -65,7 +66,8 @@ class AIChatCredentialManager;
 // the in-memory conversation history.
 class ConversationHandler : public mojom::ConversationHandler,
                             public mojom::UntrustedConversationHandler,
-                            public ModelService::Observer {
+                            public ModelService::Observer,
+                            public ConversationHandlerForMetrics {
  public:
   // |invalidation_token| is an optional parameter that will be passed back on
   // the next call to |GetPageContent| so that the implementer may determine if
@@ -253,7 +255,10 @@ class ConversationHandler : public mojom::ConversationHandler,
   void GetModels(GetModelsCallback callback) override;
   void ChangeModel(const std::string& model_key) override;
   void GetIsRequestInProgress(GetIsRequestInProgressCallback callback) override;
-  void SubmitHumanConversationEntry(const std::string& input) override;
+  void SubmitHumanConversationEntry(
+      const std::string& input,
+      std::optional<std::vector<mojom::UploadedImagePtr>> uploaded_images)
+      override;
   void SubmitHumanConversationEntry(mojom::ConversationTurnPtr turn);
   void SubmitHumanConversationEntryWithAction(
       const std::string& input,
@@ -286,8 +291,8 @@ class ConversationHandler : public mojom::ConversationHandler,
                                   mojom::ActionType action_type,
                                   mojom::APIError error);
   void OnAssociatedContentTitleChanged();
-  void OnFaviconImageDataChanged();
   void OnUserOptedIn();
+  size_t GetConversationHistorySize() override;
 
   // Some associated content may provide some conversation that the user wants
   // to continue, e.g. Brave Search.
@@ -298,6 +303,10 @@ class ConversationHandler : public mojom::ConversationHandler,
   }
 
   std::string get_conversation_uuid() const { return metadata_->uuid; }
+
+  bool should_send_page_contents() const override;
+
+  mojom::APIError current_error() const override;
 
   void SetEngineForTesting(std::unique_ptr<EngineConsumer> engine_for_testing) {
     engine_ = std::move(engine_for_testing);
@@ -366,7 +375,7 @@ class ConversationHandler : public mojom::ConversationHandler,
   };
 
   void InitEngine();
-  void BuildAssociatedContentInfo();
+  void UpdateAssociatedContentInfo();
   mojom::ConversationEntriesStatePtr GetStateForConversationEntries();
   bool IsContentAssociationPossible();
   int GetContentUsedPercentage();
@@ -421,7 +430,6 @@ class ConversationHandler : public mojom::ConversationHandler,
   void OnConversationTitleChanged(std::string_view title);
   void OnConversationUIConnectionChanged(mojo::RemoteSetElementId id);
   void OnSelectedLanguageChanged(const std::string& selected_language);
-  void OnAssociatedContentFaviconImageDataChanged();
   void OnAPIRequestInProgressChanged();
   void OnStateForConversationEntriesChanged();
 

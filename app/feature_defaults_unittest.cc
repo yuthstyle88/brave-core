@@ -85,6 +85,8 @@ TEST(FeatureDefaultsTest, DisabledFeatures) {
       &android_webview::features::kWebViewMediaIntegrityApiBlinkExtension,
 #endif
       &attribution_reporting::features::kConversionMeasurement,
+      &autofill::features::kAutofillEnableCardBenefitsForAmericanExpress,
+      &autofill::features::kAutofillEnableCardBenefitsForBmo,
       &autofill::features::test::kAutofillServerCommunication,
 #if BUILDFLAG(IS_ANDROID)
       &base::features::kCollectAndroidFrameTimelineMetrics,
@@ -108,7 +110,6 @@ TEST(FeatureDefaultsTest, DisabledFeatures) {
       &blink::features::kPrivateAggregationApi,
       &blink::features::kSharedStorageAPI,
       &blink::features::kSpeculationRulesPrefetchFuture,
-      &blink::features::kTextFragmentAnchor,
 #if BUILDFLAG(IS_ANDROID)
       &chrome::android::kAdaptiveButtonInTopToolbarCustomizationV2,
 #endif
@@ -131,6 +132,9 @@ TEST(FeatureDefaultsTest, DisabledFeatures) {
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX)
       &feature_engagement::kIPHGMCCastStartStopFeature,
       &feature_engagement::kIPHPasswordsManagementBubbleAfterSaveFeature,
+#endif
+#if !BUILDFLAG(IS_ANDROID)
+      &features::kToolbarPinning,
 #endif
       &features::kBookmarkTriggerForPrerender2,
       &features::kChromeStructuredMetrics,
@@ -286,4 +290,5 @@ TEST(FeatureDefaultsTest, DefaultFeatureParameters) {
   EXPECT_EQ(features::kLocationProviderManagerParam.default_value,
             device::mojom::LocationProviderManagerMode::kPlatformOnly);
 #endif
+  EXPECT_FALSE(features::kShowDefaultBrowserAppMenuItem.default_value);
 }

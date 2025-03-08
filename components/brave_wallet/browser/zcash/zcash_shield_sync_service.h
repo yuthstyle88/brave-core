@@ -138,9 +138,11 @@ class ZCashShieldSyncService {
   uint32_t GetSpendableBalance();
 
   // Update spendable notes state
-  void UpdateSpendableNotes();
+  void UpdateSpendableNotes(const ScanRangeResult& scan_range_result);
   void OnGetSpendableNotes(
-      base::expected<std::vector<OrchardNote>, OrchardStorage::Error> result);
+      const ScanRangeResult& scan_range_result,
+      base::expected<std::optional<OrchardSyncState::SpendableNotesBundle>,
+                     OrchardStorage::Error> result);
 
   void StartBlockScanning();
   void OnScanRangeResult(
@@ -172,7 +174,7 @@ class ZCashShieldSyncService {
   std::optional<ScanRangeResult> latest_scanned_block_result_;
 
   // Local cache of spendable notes to fast check on discovered nullifiers
-  std::optional<std::vector<OrchardNote>> spendable_notes_;
+  std::optional<OrchardSyncState::SpendableNotesBundle> spendable_notes_bundle_;
   std::optional<Error> error_;
 
   mojom::ZCashShieldSyncStatusPtr current_sync_status_;

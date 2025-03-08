@@ -18,7 +18,7 @@ extension BrowserViewController: WKDownloadDelegate {
   ) async -> URL? {
 
     if let httpResponse = response as? HTTPURLResponse {
-      if httpResponse.mimeType != MIMEType.passbook {
+      if ![MIMEType.passbook, MIMEType.passbookBundle].contains(httpResponse.mimeType) {
         let shouldDownload = await downloadAlert(
           download,
           response: response,
@@ -83,7 +83,9 @@ extension BrowserViewController: WKDownloadDelegate {
       textEncodingName: downloadInfo.response.textEncodingName
     )
 
-    if downloadInfo.response.mimeType == MIMEType.passbook {
+    if [MIMEType.passbook, MIMEType.passbookBundle].contains(
+      downloadInfo.response.mimeType
+    ) {
       downloadQueue.download(downloadInfo, didFinishDownloadingTo: downloadInfo.fileURL)
       if let passbookHelper = OpenPassBookHelper(
         request: nil,
@@ -154,7 +156,7 @@ extension BrowserViewController: WKDownloadDelegate {
     }
 
     // Never present the download alert on a tab that isn't visible
-    guard let webView = download.webView, let tab = tabManager.tabForWebView(webView),
+    guard let webView = download.webView, let tab = tabManager[webView],
       tab === tabManager.selectedTab
     else {
       return false

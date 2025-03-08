@@ -108,14 +108,15 @@ void ChromeAutocompleteProviderClient::OpenLeo(const std::u16string& query) {
           base::UTF16ToUTF8(query) /* text */, std::nullopt /* prompt */,
           std::nullopt /* selected_text */, std::nullopt /* events */,
           base::Time::Now(), std::nullopt /* edits */,
+          std::nullopt /* uploaded images */,
           false /* from_brave_search_SERP */);
-
-  conversation_handler->SubmitHumanConversationEntry(std::move(turn));
 
   ai_chat::AIChatMetrics* metrics =
       g_brave_browser_process->process_misc_metrics()->ai_chat_metrics();
   CHECK(metrics);
   metrics->RecordOmniboxOpen();
+
+  conversation_handler->SubmitHumanConversationEntry(std::move(turn));
 #endif
 }
 

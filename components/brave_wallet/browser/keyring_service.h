@@ -248,6 +248,18 @@ class KeyringService : public mojom::KeyringService {
       const mojom::AccountIdPtr& account_id);
 #endif
 
+  void UpdateNextUnusedAddressForCardanoAccount(
+      const mojom::AccountIdPtr& account_id,
+      std::optional<uint32_t> next_external_index,
+      std::optional<uint32_t> next_internal_index);
+  mojom::CardanoAccountInfoPtr GetCardanoAccountInfo(
+      const mojom::AccountIdPtr& account_id);
+  std::optional<std::vector<mojom::CardanoAddressPtr>> GetCardanoAddresses(
+      const mojom::AccountIdPtr& account_id);
+  mojom::CardanoAddressPtr GetCardanoAddress(
+      const mojom::AccountIdPtr& account_id,
+      const mojom::CardanoKeyIdPtr& payment_key_id);
+
   const std::vector<mojom::AccountInfoPtr>& GetAllAccountInfos();
   mojom::AccountInfoPtr FindAccount(const mojom::AccountIdPtr& account_id);
   mojom::AccountInfoPtr GetSelectedWalletAccount();
@@ -354,6 +366,7 @@ class KeyringService : public mojom::KeyringService {
                             bool from_restore);
   void CreateKeyringInternal(mojom::KeyringId keyring_id,
                              const KeyringSeed& keyring_seed);
+  bool IsKeyringEnabled(mojom::KeyringId keyring_id) const;
   void CreateKeyrings(const KeyringSeed& keyring_seed);
   void ClearKeyrings();
   void CreateDefaultAccounts();
@@ -388,6 +401,8 @@ class KeyringService : public mojom::KeyringService {
   std::unique_ptr<std::vector<mojom::AccountInfoPtr>> account_info_cache_;
   std::unique_ptr<base::OneShotTimer> auto_lock_timer_;
   std::unique_ptr<PrefChangeRegistrar> pref_change_registrar_;
+
+  std::vector<mojom::KeyringId> enabled_keyrings_;
 
   std::unique_ptr<EthereumKeyring> ethereum_keyring_;
 

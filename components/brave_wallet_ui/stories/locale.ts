@@ -424,6 +424,9 @@ provideStrings({
   braveWalletCreateAccountBitcoinTestnetDescription: 'Store BTC Testnet assets',
   braveWalletCreateAccountZCashDescription: 'Store ZEC assets',
   braveWalletCreateAccountZCashTestnetDescription: 'Store ZEC Testnet assets',
+  braveWalletCreateAccountCardanoDescription: 'Store Cardano assets',
+  braveWalletCreateAccountCardanoTestnetDescription:
+    'Store Cardano Testnet assets',
   braveWalletCreateAccountFilecoinDescription: 'Store FIL asset',
   braveWalletCreateAccountFilecoinTestnetDescription: 'Store FIL Testnet asset',
   braveWalletFilecoinPrivateKeyProtocol: 'Private key $1',
@@ -1219,6 +1222,8 @@ provideStrings({
   braveWalletBTCTestnetAccountDescription: 'Bitcoin Testnet',
   braveWalletZECAccountDescription: 'Zcash Mainnet',
   braveWalletZECTestnetAccountDescription: 'Zcash Testnet',
+  braveWalletCardanoAccountDescription: 'Cardano Mainnet',
+  braveWalletCardanoTestnetAccountDescription: 'Cardano Testnet',
   braveWalletShowNetworkLogoOnNftsTitle: 'Network Logo',
   braveWalletShowNetworkLogoOnNftsDescription: 'Show network logo on NFTs',
   braveWalletShowSpamNftsTitle: 'Spam NFTs',
@@ -1252,6 +1257,8 @@ provideStrings({
   braveWalletSwappingOrBridgingOnNetwork: '$1$5$2 on $3$6$4',
   braveWalletErrorAttemptingToTransactOnNetwork:
     'There was an error attempting to $1$5$2 on $3$6$4',
+  braveWalletShieldingAmount: 'Shielding $1$5$2',
+  braveWalletAmountHasBeenShielded: '$1$5$2 has been shielded',
   // Submitted
   braveWalletTransactionSubmittedTitle: 'Transaction submitted',
   braveWalletTransactionSignedTitle: 'Transaction signed',
@@ -1533,6 +1540,8 @@ provideStrings({
   braveWalletOutOfSyncBlocksBehindTitle: 'Out of sync ($1 blocks behind)',
   braveWalletOutOfSyncDescription:
     'Sync your account to access the latest transactions and balance.',
+  braveWalletZCashPendingBalanceTitle:
+    'Pending balance (more confirmations required): $1',
   braveWalletSyncAccountButton: 'Sync account',
   braveWalletSyncAccountName: 'Sync $1',
   braveWalletInitializing: 'Initializing...',
@@ -1551,5 +1560,8 @@ provideStrings({
   braveWalletAccountBirthdayTooHigh: 'Account birthday must be less than $1',
   braveWalletBlocksBehind: '$1 blocks behind',
   braveWalletAccountIsSyncing: 'Account is syncing',
-  braveWalletSyncing: 'Syncing'
+  braveWalletSyncing: 'Syncing',
+  braveWalletReviewShield: 'Review shield',
+  braveWalletShielding: 'Shielding',
+  braveWalletShieldZEC: 'Shield ZEC'
 })

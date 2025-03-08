@@ -126,7 +126,6 @@ const Config = function () {
   this.internalDepsUrl = 'https://vhemnu34de4lf5cj6bx2wwshyy0egdxk.lambda-url.us-west-2.on.aws'
   this.defaultBuildConfig = getEnvConfig(['default_build_config']) || 'Component'
   this.buildConfig = this.defaultBuildConfig
-  this.signTarget = 'sign_app'
   this.buildTargets = ['brave']
   this.rootDir = rootDir
   this.isUniversalBinary = false
@@ -254,6 +253,7 @@ const Config = function () {
   this.service_key_aichat = getEnvConfig(['service_key_aichat']) || ''
   this.braveIOSDeveloperOptionsCode = getEnvConfig(['brave_ios_developer_options_code']) || ''
   this.service_key_stt = getEnvConfig(['service_key_stt']) || ''
+  this.skip_download_rust_toolchain_aux = getEnvConfig(['skip_download_rust_toolchain_aux']) || false
 }
 
 Config.prototype.isReleaseBuild = function () {
@@ -1036,7 +1036,7 @@ Object.defineProperty(Config.prototype, 'defaultOptions', {
     env = this.addPathToEnv(env, this.depotToolsDir, true)
     if (this.getTargetOS() === 'mac' && process.platform !== 'darwin') {
       const crossCompilePath = path.join(this.srcDir, 'brave', 'build', 'mac',
-                                         'cross-compile', 'path')
+                                         'cross_compile', 'path')
       env = this.addPathToEnv(env, crossCompilePath, true)
     }
     const pythonPaths = [
@@ -1135,6 +1135,10 @@ Object.defineProperty(Config.prototype, 'defaultOptions', {
     if (process.platform === 'win32') {
       // Disable vcvarsall.bat telemetry.
       env.VSCMD_SKIP_SENDTELEMETRY = '1'
+    }
+
+    if (this.isCI && this.skip_download_rust_toolchain_aux) {
+      env.SKIP_DOWNLOAD_RUST_TOOLCHAIN_AUX = '1'
     }
 
     // TeamCity displays only stderr on the "Build Problems" page when an error

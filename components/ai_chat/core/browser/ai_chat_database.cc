@@ -243,15 +243,12 @@ std::vector<mojom::ConversationPtr> AIChatDatabase::GetAllConversations() {
     conversation->updated_time = statement.ColumnTime(index++);
     conversation->has_content = true;
 
-    conversation->associated_content = mojom::SiteInfo::New();
-    conversation->associated_content->content_id = mojom::kContentIdNone;
-
     if (statement.GetColumnType(index) != sql::ColumnType::kNull) {
       DVLOG(1) << __func__ << " got associated content";
-
+      conversation->associated_content = mojom::AssociatedContent::New();
       conversation->associated_content->uuid = statement.ColumnString(index++);
       conversation->associated_content->title =
-          DecryptOptionalColumnToString(statement, index++);
+          DecryptOptionalColumnToString(statement, index++).value_or("");
       auto url_raw = DecryptOptionalColumnToString(statement, index++);
       if (url_raw.has_value()) {
         conversation->associated_content->url = GURL(url_raw.value());
@@ -262,9 +259,6 @@ std::vector<mojom::ConversationPtr> AIChatDatabase::GetAllConversations() {
           statement.ColumnInt(index++);
       conversation->associated_content->is_content_refined =
           statement.ColumnBool(index++);
-      conversation->associated_content->is_content_association_possible = true;
-    } else {
-      conversation->associated_content->is_content_association_possible = false;
     }
   }
 
@@ -329,7 +323,7 @@ std::vector<mojom::ConversationTurnPtr> AIChatDatabase::GetConversationEntries(
 
     auto entry = mojom::ConversationTurn::New(
         entry_uuid, character_type, action_type, text, prompt, selected_text,
-        std::nullopt, date, std::nullopt, false);
+        std::nullopt, date, std::nullopt, std::nullopt, false);
 
     // events
     struct Event {
@@ -418,6 +412,29 @@ std::vector<mojom::ConversationTurnPtr> AIChatDatabase::GetConversationEntries(
       }
     }
 
+    // Uploaded images
+    sql::Statement uploaded_file_statement(
+        GetDB().GetUniqueStatement("SELECT filename, filesize, data"
+                                   " FROM conversation_entry_uploaded_files"
+                                   " WHERE conversation_entry_uuid=?"
+                                   " ORDER BY file_order ASC"));
+    uploaded_file_statement.BindString(0, entry_uuid);
+
+    while (uploaded_file_statement.Step()) {
+      auto filename = DecryptColumnToString(uploaded_file_statement, 0);
+      int64_t filesize = uploaded_file_statement.ColumnInt64(1);
+      auto decrypted_image_str =
+          DecryptColumnToString(uploaded_file_statement, 2);
+      base::span<const uint8_t> image_bytes =
+          base::as_byte_span(decrypted_image_str);
+      std::vector<uint8_t> image_data(image_bytes.begin(), image_bytes.end());
+      if (!entry->uploaded_images) {
+        entry->uploaded_images = std::vector<mojom::UploadedImagePtr>{};
+      }
+      entry->uploaded_images->emplace_back(mojom::UploadedImage::New(
+          std::move(filename), filesize, std::move(image_data)));
+    }
+
     // root entry or edited entry
     if (editing_entry_id.has_value()) {
       DVLOG(4) << "Collected edit entry for " << editing_entry_id.value()
@@ -504,10 +521,10 @@ bool AIChatDatabase::AddConversation(mojom::ConversationPtr conversation,
     return false;
   }
 
-  if (conversation->associated_content->is_content_association_possible) {
+  if (conversation->associated_content) {
     DVLOG(2) << "Adding associated content for conversation "
              << conversation->uuid << " with url "
-             << conversation->associated_content->url->spec();
+             << conversation->associated_content->url.spec();
     if (!AddOrUpdateAssociatedContent(
             conversation->uuid, std::move(conversation->associated_content),
             contents)) {
@@ -530,7 +547,7 @@ bool AIChatDatabase::AddConversation(mojom::ConversationPtr conversation,
 
 bool AIChatDatabase::AddOrUpdateAssociatedContent(
     std::string_view conversation_uuid,
-    mojom::SiteInfoPtr associated_content,
+    mojom::AssociatedContentPtr associated_content,
     std::optional<std::string> contents) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!LazyInit()) {
@@ -539,7 +556,7 @@ bool AIChatDatabase::AddOrUpdateAssociatedContent(
 
   // TODO(petemill): handle multiple associated content per conversation
   CHECK(!conversation_uuid.empty());
-  CHECK(associated_content->uuid.has_value());
+  CHECK(associated_content);
 
   // Check if we already have persisted this content
   static constexpr char kSelectExistingAssociatedContentId[] =
@@ -549,13 +566,12 @@ bool AIChatDatabase::AddOrUpdateAssociatedContent(
       SQL_FROM_HERE, kSelectExistingAssociatedContentId));
   CHECK(select_statement.is_valid());
   select_statement.BindString(0, conversation_uuid);
-  select_statement.BindString(1, associated_content->uuid.value());
+  select_statement.BindString(1, associated_content->uuid);
 
   sql::Statement statement;
   if (select_statement.Step()) {
     DVLOG(4) << "Updating associated content for conversation "
-             << conversation_uuid << " with id "
-             << associated_content->uuid.value();
+             << conversation_uuid << " with id " << associated_content->uuid;
     static constexpr char kUpdateAssociatedContentQuery[] =
         "UPDATE associated_content"
         " SET title = ?,"
@@ -580,13 +596,13 @@ bool AIChatDatabase::AddOrUpdateAssociatedContent(
   int index = 0;
   BindAndEncryptOptionalString(statement, index++, associated_content->title);
   BindAndEncryptOptionalString(statement, index++,
-                               associated_content->url->spec());
+                               associated_content->url.spec());
   statement.BindInt(index++,
                     base::to_underlying(associated_content->content_type));
   BindAndEncryptOptionalString(statement, index++, contents);
   statement.BindInt(index++, associated_content->content_used_percentage);
   statement.BindBool(index++, associated_content->is_content_refined);
-  statement.BindString(index++, associated_content->uuid.value());
+  statement.BindString(index++, associated_content->uuid);
   statement.BindString(index, conversation_uuid);
 
   if (!statement.Run()) {
@@ -780,6 +796,33 @@ bool AIChatDatabase::AddConversationEntry(
     }
   }
 
+  if (entry->uploaded_images.has_value()) {
+    for (size_t i = 0; i < entry->uploaded_images->size(); ++i) {
+      const mojom::UploadedImagePtr& uploaded_image =
+          entry->uploaded_images->at(i);
+      sql::Statement uploaded_file_statement(GetDB().GetCachedStatement(
+          SQL_FROM_HERE,
+          "INSERT INTO conversation_entry_uploaded_files"
+          "(file_order, filename, filesize, data,"
+          " conversation_entry_uuid)"
+          " VALUES(?, ?, ?, ?, ?)"));
+      CHECK(uploaded_file_statement.is_valid());
+      uploaded_file_statement.BindInt(0, static_cast<int>(i));
+      if (!BindAndEncryptString(uploaded_file_statement, 1,
+                                uploaded_image->filename)) {
+        return false;
+      }
+      uploaded_file_statement.BindInt64(2, uploaded_image->filesize);
+      if (!BindAndEncryptString(
+              uploaded_file_statement, 3,
+              base::as_string_view(base::span(uploaded_image->image_data)))) {
+        return false;
+      }
+      uploaded_file_statement.BindString(4, entry->uuid.value());
+      uploaded_file_statement.Run();
+    }
+  }
+
   if (!transaction.Commit()) {
     DVLOG(0) << "Transaction commit failed with reason: "
              << db_.GetErrorMessage();
@@ -876,6 +919,17 @@ bool AIChatDatabase::DeleteConversation(std::string_view conversation_uuid) {
     CHECK(delete_conversation_entry_statement.is_valid());
     delete_conversation_entry_statement.BindString(0, conversation_entry_uuid);
     if (!delete_conversation_entry_statement.Run()) {
+      return false;
+    }
+
+    static constexpr char kDeleteUploadedFilesQuery[] =
+        "DELETE FROM conversation_entry_uploaded_files "
+        " WHERE conversation_entry_uuid=?";
+    sql::Statement delete_uploaded_images_statement(
+        GetDB().GetUniqueStatement(kDeleteUploadedFilesQuery));
+    CHECK(delete_uploaded_images_statement.is_valid());
+    delete_uploaded_images_statement.BindString(0, conversation_entry_uuid);
+    if (!delete_uploaded_images_statement.Run()) {
       return false;
     }
   }
@@ -981,6 +1035,23 @@ bool AIChatDatabase::DeleteConversationEntry(
     if (!delete_statement.Run()) {
       DLOG(ERROR) << "Failed to delete from conversation_entry for "
                      "conversation entry uuid: "
+                  << conversation_entry_uuid;
+      return false;
+    }
+  }
+
+  // Delete from conversation_entry_uploaded_files
+  {
+    static constexpr char kQuery[] =
+        "DELETE FROM conversation_entry_uploaded_files WHERE "
+        "conversation_entry_uuid=?";
+    sql::Statement delete_statement(GetDB().GetUniqueStatement(kQuery));
+    CHECK(delete_statement.is_valid());
+    delete_statement.BindString(0, conversation_entry_uuid);
+    if (!delete_statement.Run()) {
+      DLOG(ERROR) << "Failed to delete from "
+                     "conversation_entry_uploaded_files for conversation "
+                     "entry uuid: "
                   << conversation_entry_uuid;
       return false;
     }
@@ -1145,9 +1216,8 @@ bool AIChatDatabase::CreateSchema() {
       "title BLOB,"
       // Encrypted url string
       "url BLOB,"
-      // Stores SiteInfo.IsVideo. Future-proofed for multiple content types
-      // 0 for regular content
-      // 1 for video.
+      // Stores AssociatedContent.IsVideo. Future-proofed for multiple content
+      // types 0 for regular content 1 for video.
       "content_type INTEGER NOT NULL,"
       // Encrypted string value of the content, so that conversations can be
       // continued.
@@ -1230,6 +1300,22 @@ bool AIChatDatabase::CreateSchema() {
       ")";
   CHECK(GetDB().IsSQLValid(kCreateWebSourcesTableQuery));
   if (!GetDB().Execute(kCreateWebSourcesTableQuery)) {
+    return false;
+  }
+
+  static constexpr char kCreateUploadedFilesTableQuery[] =
+      "CREATE TABLE IF NOT EXISTS conversation_entry_uploaded_files("
+      "conversation_entry_uuid INTEGER NOT NULL,"
+      "file_order INTEGER NOT NULL,"
+      // encrypted filename
+      "filename BLOB NOT NULL,"
+      "filesize INTEGER NOT NULL,"
+      // encrypted file byte data
+      "data BLOB NOT NULL,"
+      "PRIMARY KEY(conversation_entry_uuid, file_order)"
+      ")";
+  CHECK(GetDB().IsSQLValid(kCreateUploadedFilesTableQuery));
+  if (!GetDB().Execute(kCreateUploadedFilesTableQuery)) {
     return false;
   }
 

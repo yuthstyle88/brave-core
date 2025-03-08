@@ -81,26 +81,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     KeyboardHelper.defaultHelper.startObserving()
     DynamicFontHelper.defaultHelper.startObserving()
     ReaderModeFonts.registerCustomFonts()
-    FocusOnboardingFonts.registerCustomFonts()
 
     MenuHelper.defaultHelper.setItems()
 
     SDImageCodersManager.shared.addCoder(PrivateCDNImageCoder())
-
-    // Temporary fix for Bug 1390871 - NSInvalidArgumentException: -[WKContentView menuHelperFindInPage]: unrecognized selector
-    if let clazz = NSClassFromString("WKCont" + "ent" + "View"),
-      let swizzledMethod = class_getInstanceMethod(
-        TabWebViewMenuHelper.self,
-        #selector(TabWebViewMenuHelper.swizzledMenuHelperFindInPage)
-      )
-    {
-      class_addMethod(
-        clazz,
-        MenuHelper.selectorFindInPage,
-        method_getImplementation(swizzledMethod),
-        method_getTypeEncoding(swizzledMethod)
-      )
-    }
 
     if Preferences.BraveNews.isEnabled.value && !Preferences.BraveNews.userOptedIn.value {
       // Opt-out any user that has not explicitly opted-in

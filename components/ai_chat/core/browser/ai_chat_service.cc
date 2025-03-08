@@ -159,11 +159,7 @@ ConversationHandler* AIChatService::CreateConversation() {
   // Create the conversation metadata
   {
     mojom::ConversationPtr conversation = mojom::Conversation::New(
-        conversation_uuid, "", base::Time::Now(), false, std::nullopt,
-        mojom::SiteInfo::New(base::Uuid::GenerateRandomV4().AsLowercaseString(),
-                             mojom::ContentType::PageContent, std::nullopt,
-                             std::nullopt, mojom::kContentIdNone, std::nullopt,
-                             0, false, false));
+        conversation_uuid, "", base::Time::Now(), false, std::nullopt, nullptr);
     conversations_.insert_or_assign(conversation_uuid, std::move(conversation));
   }
   mojom::Conversation* conversation =
@@ -313,7 +309,7 @@ void AIChatService::DeleteConversations(std::optional<base::Time> begin_time,
       ReloadConversations();
     }
     if (ai_chat_metrics_ != nullptr) {
-      ai_chat_metrics_->RecordReset();
+      ai_chat_metrics_->RecordConversationsCleared();
     }
     OnConversationListChanged();
     return;
@@ -588,6 +584,9 @@ void AIChatService::DeleteConversation(const std::string& id) {
   if (handler_it != conversation_handlers_.end()) {
     conversation_observations_.RemoveObservation(handler_it->second.get());
     conversation_handlers_.erase(id);
+    if (ai_chat_metrics_) {
+      ai_chat_metrics_->RecordConversationUnload(id);
+    }
   }
   conversations_.erase(id);
   DVLOG(1) << "Erased conversation due to deletion request (" << id
@@ -657,6 +656,7 @@ void AIChatService::MaybeUnloadConversation(
   auto uuid = conversation_handler->get_conversation_uuid();
   conversation_observations_.RemoveObservation(conversation_handler);
   conversation_handlers_.erase(uuid);
+
   DVLOG(1) << "Unloaded conversation (" << uuid << ") from memory. Now have "
            << conversations_.size() << " Conversation metadata items and "
            << conversation_handlers_.size()
@@ -715,6 +715,9 @@ bool AIChatService::IsAIChatHistoryEnabled() {
 
 void AIChatService::OnRequestInProgressChanged(ConversationHandler* handler,
                                                bool in_progress) {
+  if (ai_chat_metrics_) {
+    ai_chat_metrics_->MaybeRecordLastError(handler);
+  }
   // We don't unload a conversation if it has a request in progress, so check
   // again when that changes.
   if (!in_progress) {
@@ -749,7 +752,7 @@ void AIChatService::HandleFirstEntry(
   DVLOG(1) << __func__ << " Conversation " << conversation->uuid
            << " being persisted for first time.";
   CHECK(entry->uuid.has_value());
-  CHECK(conversation->associated_content->uuid.has_value());
+
   // We can persist the conversation metadata for the first time as well as the
   // entry.
   if (ai_chat_db_) {
@@ -761,8 +764,7 @@ void AIChatService::HandleFirstEntry(
   // Record metrics
   if (ai_chat_metrics_ != nullptr) {
     if (handler->GetConversationHistory().size() == 1) {
-      ai_chat_metrics_->RecordNewChat();
-      ai_chat_metrics_->RecordNewPrompt();
+      ai_chat_metrics_->RecordNewPrompt(handler, conversation, entry);
     }
   }
 }
@@ -785,7 +787,7 @@ void AIChatService::HandleNewEntry(
                   conversation->model_key, std::nullopt);
 
     if (associated_content_value.has_value() &&
-        conversation->associated_content->is_content_association_possible) {
+        conversation->associated_content) {
       ai_chat_db_
           .AsyncCall(
               base::IgnoreResult(&AIChatDatabase::AddOrUpdateAssociatedContent))
@@ -798,7 +800,7 @@ void AIChatService::HandleNewEntry(
   // Record metrics
   if (ai_chat_metrics_ != nullptr &&
       entry->character_type == mojom::CharacterType::HUMAN) {
-    ai_chat_metrics_->RecordNewPrompt();
+    ai_chat_metrics_->RecordNewPrompt(handler, conversation, entry);
   }
 }
 
@@ -815,6 +817,10 @@ void AIChatService::OnConversationEntryRemoved(ConversationHandler* handler,
 void AIChatService::OnClientConnectionChanged(ConversationHandler* handler) {
   DVLOG(4) << "Client connection changed for conversation "
            << handler->get_conversation_uuid();
+  if (ai_chat_metrics_ != nullptr && !handler->IsAnyClientConnected()) {
+    ai_chat_metrics_->RecordConversationUnload(
+        handler->get_conversation_uuid());
+  }
   MaybeUnloadConversation(handler);
 }
 
@@ -879,6 +885,12 @@ void AIChatService::BindConversation(
                           std::move(conversation_ui_handler));
           },
           std::move(receiver), std::move(conversation_ui_handler)));
+}
+
+void AIChatService::BindMetrics(mojo::PendingReceiver<mojom::Metrics> metrics) {
+  if (ai_chat_metrics_) {
+    ai_chat_metrics_->Bind(std::move(metrics));
+  }
 }
 
 void AIChatService::BindObserver(

@@ -12,6 +12,7 @@ import BraveVPN
 import BraveWallet
 import Combine
 import Data
+import DataImporter
 import Growth
 import LocalAuthentication
 import NetworkExtension
@@ -281,7 +282,25 @@ class SettingsViewController: TableViewController {
             UIApplication.shared.open(settingsUrl)
           },
           cellClass: MultilineButtonCell.self
-        )
+        ),
+        .init(
+          text: Strings.importBrowsingDataSettingsMenuTitle,
+          selection: { [unowned self] in
+            let controller = UIHostingController(
+              rootView: DataImportView(
+                openURL: { [unowned self] url in
+                  self.settingsDelegate?.settingsOpenURLInNewTab(url)
+                  self.dismiss(animated: true)
+                },
+                onDismiss: { [weak self] in
+                  self?.navigationController?.setNavigationBarHidden(false, animated: false)
+                }
+              )
+            )
+            self.navigationController?.pushViewController(controller, animated: true)
+          },
+          cellClass: MultilineButtonCell.self
+        ),
       ]
     )
 
@@ -415,17 +434,19 @@ class SettingsViewController: TableViewController {
       )
     )
 
-    section.rows.append(
-      Row(
-        text: Strings.BraveTranslate.settingsMenuTitle,
-        selection: { [unowned self] in
-          let translateSettings = UIHostingController(rootView: BraveTranslateSettingsView())
-          self.navigationController?.pushViewController(translateSettings, animated: true)
-        },
-        image: UIImage(braveSystemNamed: "leo.product.translate"),
-        accessory: .disclosureIndicator
+    if FeatureList.kBraveTranslateEnabled.enabled {
+      section.rows.append(
+        Row(
+          text: Strings.BraveTranslate.settingsMenuTitle,
+          selection: { [unowned self] in
+            let translateSettings = UIHostingController(rootView: BraveTranslateSettingsView())
+            self.navigationController?.pushViewController(translateSettings, animated: true)
+          },
+          image: UIImage(braveSystemNamed: "leo.product.translate"),
+          accessory: .disclosureIndicator
+        )
       )
-    )
+    }
 
     return section
   }
@@ -457,9 +478,7 @@ class SettingsViewController: TableViewController {
               }
 
               let syncSettingsViewController = SyncSettingsTableViewController(
-                syncAPI: syncAPI,
-                syncProfileService:
-                  syncProfileServices,
+                braveCoreMain: braveCore,
                 tabManager: tabManager,
                 windowProtection: windowProtection
               )
@@ -468,8 +487,7 @@ class SettingsViewController: TableViewController {
                 .pushViewController(syncSettingsViewController, animated: true)
             } else {
               let syncWelcomeViewController = SyncWelcomeViewController(
-                syncAPI: syncAPI,
-                syncProfileServices: syncProfileServices,
+                braveCore: braveCore,
                 tabManager: tabManager,
                 windowProtection: windowProtection
               )
@@ -853,8 +871,7 @@ class SettingsViewController: TableViewController {
       selection: { [unowned self] in
         let model = AIChatViewModel(
           braveCore: self.braveCore,
-          webView: self.tabManager.selectedTab?.webView,
-          script: BraveLeoScriptHandler.self,
+          webDelegate: self.tabManager.selectedTab?.leoTabHelper,
           braveTalkScript: nil
         )
 

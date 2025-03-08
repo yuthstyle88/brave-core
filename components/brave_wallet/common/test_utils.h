@@ -7,9 +7,10 @@
 #define BRAVE_COMPONENTS_BRAVE_WALLET_COMMON_TEST_UTILS_H_
 
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "brave/components/brave_wallet/common/brave_wallet.mojom.h"
-#include "brave/components/brave_wallet/common/common_utils.h"
 #include "testing/gmock/include/gmock/gmock-matchers.h"
 
 namespace brave_wallet {
@@ -39,6 +40,28 @@ auto MakeVectorFromArgs(Args&&... args) {
 }
 
 }  // namespace test
+
+inline constexpr mojom::CoinType kAllCoins[] = {
+    mojom::CoinType::ETH, mojom::CoinType::FIL, mojom::CoinType::SOL,
+    mojom::CoinType::BTC, mojom::CoinType::ZEC, mojom::CoinType::ADA,
+};
+
+inline constexpr mojom::KeyringId kAllKeyrings[] = {
+    mojom::KeyringId::kDefault,
+    mojom::KeyringId::kBitcoin84,
+    mojom::KeyringId::kBitcoin84Testnet,
+    mojom::KeyringId::kFilecoin,
+    mojom::KeyringId::kFilecoinTestnet,
+    mojom::KeyringId::kSolana,
+    mojom::KeyringId::kZCashMainnet,
+    mojom::KeyringId::kZCashTestnet,
+    mojom::KeyringId::kBitcoinImport,
+    mojom::KeyringId::kBitcoinImportTestnet,
+    mojom::KeyringId::kZCashMainnet,
+    mojom::KeyringId::kZCashTestnet,
+    mojom::KeyringId::kCardanoMainnet,
+    mojom::KeyringId::kCardanoTestnet,
+};
 
 // Change calling test's hardcoded value only after it has adequate testing for
 // newly added coin.
@@ -88,6 +111,8 @@ void PrintTo(const BitcoinKeyId& key_id, ::std::ostream* os);
 void PrintTo(const BitcoinAccountInfoPtr& account_info, ::std::ostream* os);
 void PrintTo(const BtcHardwareTransactionSignInputDataPtr& input_data,
              ::std::ostream* os);
+void PrintTo(const CardanoAddressPtr& address, ::std::ostream* os);
+void PrintTo(const CardanoBalancePtr& balance, ::std::ostream* os);
 
 }  // namespace mojom
 

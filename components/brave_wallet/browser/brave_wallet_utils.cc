@@ -779,6 +779,10 @@ std::string WalletInternalErrorMessage() {
   return l10n_util::GetStringUTF8(IDS_WALLET_INTERNAL_ERROR);
 }
 
+std::string WalletParsingErrorMessage() {
+  return l10n_util::GetStringUTF8(IDS_WALLET_PARSING_ERROR);
+}
+
 mojom::BlockchainTokenPtr GetBitcoinNativeToken(std::string_view chain_id) {
   auto network = NetworkManager::GetKnownChain(chain_id, mojom::CoinType::BTC);
   CHECK(network);
@@ -802,6 +806,21 @@ mojom::BlockchainTokenPtr GetZcashNativeToken(std::string_view chain_id) {
   auto result = NetworkToNativeToken(*network);
   result->logo = "zec.png";
   result->coingecko_id = "zec";
+
+  return result;
+}
+
+mojom::BlockchainTokenPtr GetCardanoNativeToken(std::string_view chain_id) {
+  auto network = NetworkManager::GetKnownChain(chain_id, mojom::CoinType::ADA);
+  CHECK(network);
+
+  auto result = NetworkToNativeToken(*network);
+  result->logo = "ada.png";
+  if (chain_id == mojom::kCardanoMainnet) {
+    result->coingecko_id = "ada";
+  } else {
+    result->coingecko_id = "";
+  }
 
   return result;
 }

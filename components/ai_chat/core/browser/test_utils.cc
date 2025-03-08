@@ -9,10 +9,12 @@
 #include <utility>
 
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/time/time.h"
 #include "base/uuid.h"
 #include "brave/components/ai_chat/core/common/mojom/ai_chat.mojom-forward.h"
 #include "brave/components/ai_chat/core/common/mojom/ai_chat.mojom.h"
+#include "brave/components/ai_chat/core/common/test_utils.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace ai_chat {
@@ -77,8 +79,8 @@ void ExpectConversationEquals(base::Location location,
 }
 
 void ExpectAssociatedContentEquals(base::Location location,
-                                   const mojom::SiteInfoPtr& a,
-                                   const mojom::SiteInfoPtr& b) {
+                                   const mojom::AssociatedContentPtr& a,
+                                   const mojom::AssociatedContentPtr& b) {
   SCOPED_TRACE(testing::Message() << location.ToString());
   if (!a || !b) {
     EXPECT_EQ(a, b);  // Both should be null or neither
@@ -90,8 +92,6 @@ void ExpectAssociatedContentEquals(base::Location location,
   EXPECT_EQ(a->content_type, b->content_type);
   EXPECT_EQ(a->content_used_percentage, b->content_used_percentage);
   EXPECT_EQ(a->is_content_refined, b->is_content_refined);
-  EXPECT_EQ(a->is_content_association_possible,
-            b->is_content_association_possible);
 }
 
 void ExpectConversationHistoryEquals(
@@ -170,6 +170,21 @@ void ExpectConversationEntryEquals(base::Location location,
     }
   }
 
+  // compare uploaded images
+  EXPECT_EQ(a->uploaded_images.has_value(), b->uploaded_images.has_value());
+  if (a->uploaded_images.has_value()) {
+    EXPECT_EQ(a->uploaded_images->size(), b->uploaded_images->size());
+    for (size_t i = 0; i < a->uploaded_images->size(); ++i) {
+      SCOPED_TRACE(testing::Message()
+                   << "Comparing uplodaed images at index " << i);
+      const auto& uploaded_image_a = a->uploaded_images->at(i);
+      const auto& uploaded_image_b = b->uploaded_images->at(i);
+      EXPECT_EQ(uploaded_image_a->filename, uploaded_image_b->filename);
+      EXPECT_EQ(uploaded_image_a->filesize, uploaded_image_b->filesize);
+      EXPECT_EQ(uploaded_image_a->image_data, uploaded_image_b->image_data);
+    }
+  }
+
   // compare edits
   EXPECT_EQ(a->edits.has_value(), b->edits.has_value());
   if (a->edits.has_value()) {
@@ -198,18 +213,24 @@ mojom::Conversation* GetConversation(
 
 std::vector<mojom::ConversationTurnPtr> CreateSampleChatHistory(
     size_t num_query_pairs,
-    int32_t future_hours) {
+    int32_t future_hours,
+    size_t num_uploaded_images_per_query) {
   std::vector<mojom::ConversationTurnPtr> history;
   base::Time now = base::Time::Now();
   for (size_t i = 0; i < num_query_pairs; i++) {
     // query
+    std::optional<std::vector<mojom::UploadedImagePtr>> uploaded_images;
+    if (num_uploaded_images_per_query) {
+      uploaded_images =
+          CreateSampleUploadedImages(num_uploaded_images_per_query);
+    }
     history.push_back(mojom::ConversationTurn::New(
         base::Uuid::GenerateRandomV4().AsLowercaseString(),
         mojom::CharacterType::HUMAN, mojom::ActionType::QUERY,
         base::StrCat({"query", base::NumberToString(i)}),
         std::nullopt /* prompt */, std::nullopt, std::nullopt,
         now + base::Seconds(i * 60) + base::Hours(future_hours), std::nullopt,
-        false));
+        std::move(uploaded_images), false));
     // response
     std::vector<mojom::ConversationEntryEventPtr> events;
     events.emplace_back(mojom::ConversationEntryEvent::NewCompletionEvent(
@@ -227,7 +248,7 @@ std::vector<mojom::ConversationTurnPtr> CreateSampleChatHistory(
         mojom::CharacterType::ASSISTANT, mojom::ActionType::RESPONSE, "",
         std::nullopt /* prompt */, std::nullopt, std::move(events),
         now + base::Seconds((i * 60) + 30) + base::Hours(future_hours),
-        std::nullopt, false));
+        std::nullopt, std::nullopt, false));
   }
   return history;
 }

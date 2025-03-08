@@ -41,23 +41,33 @@ mojom::UICardItemPtr ReadItem(const base::Value& value) {
   return item;
 }
 
-std::optional<std::vector<mojom::UICardPtr>> ReadResponseBody(
-    const base::Value& body) {
-  if (!body.is_dict()) {
-    return std::nullopt;
+std::vector<mojom::UICardItemPtr> ReadItemList(const base::Value::List& list) {
+  std::vector<mojom::UICardItemPtr> items;
+  for (auto& elem : list) {
+    if (auto item = ReadItem(elem)) {
+      items.push_back(std::move(item));
+    }
   }
+  return items;
+}
 
+std::optional<std::vector<mojom::UICardPtr>> ReadResponseBody(
+    const base::Value::Dict& body) {
   std::vector<mojom::UICardPtr> cards;
 
-  for (auto [key, value] : body.GetDict()) {
+  for (auto [key, value] : body) {
     auto card = mojom::UICard::New();
     card->name = key;
 
     if (value.is_list()) {
-      for (auto& elem : value.GetList()) {
-        if (auto item = ReadItem(elem)) {
-          card->items.push_back(std::move(item));
-        }
+      card->items = ReadItemList(value.GetList());
+    } else if (value.is_dict()) {
+      auto& dict = value.GetDict();
+      if (auto* title = dict.FindString("title")) {
+        card->title = *title;
+      }
+      if (auto* list = dict.FindList("items")) {
+        card->items = ReadItemList(*list);
       }
     }
 
@@ -95,7 +105,7 @@ GetUICards::Result GetUICards::MapResponse(const mojom::UrlResponse& response) {
     return std::nullopt;
   }
 
-  auto value = base::JSONReader::Read(response.body);
+  auto value = base::JSONReader::ReadDict(response.body);
   if (!value) {
     LogError(FROM_HERE) << "Failed to parse body: invalid JSON";
     return std::nullopt;

@@ -1154,7 +1154,6 @@ public class BytecodeTest {
                         boolean.class,
                         BackPressManager.class,
                         ObservableSupplier.class,
-                        View.class,
                         ObservableSupplier.class,
                         DesktopWindowStateManager.class));
         Assert.assertTrue(
@@ -1563,7 +1562,6 @@ public class BytecodeTest {
                         Bundle.class,
                         MultiInstanceManager.class,
                         ObservableSupplier.class,
-                        View.class,
                         ManualFillingComponentSupplier.class,
                         EdgeToEdgeManager.class));
         Assert.assertTrue(
@@ -2011,12 +2009,6 @@ public class BytecodeTest {
                         "DEFAULT_FAST_VARIATIONS_SERVER_URL",
                         true,
                         String.class));
-        Assert.assertTrue(
-                fieldExists(
-                        "org/chromium/chrome/browser/omnibox/suggestions/AutocompleteMediator",
-                        "mNativeInitialized",
-                        true,
-                        boolean.class));
         Assert.assertTrue(
                 fieldExists(
                         "org/chromium/chrome/browser/omnibox/suggestions/AutocompleteMediator",

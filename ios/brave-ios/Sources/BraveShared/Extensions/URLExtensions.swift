@@ -32,7 +32,7 @@ extension URL {
       switch internalURL.urlType {
       case .errorPage:
         return internalURL.originalURLFromErrorPage
-      case .web3Page, .sessionRestorePage, .aboutHomePage:
+      case .web3Page, .aboutHomePage:
         return internalURL.extractedUrlParam
       case .blockedPage:
         return decodeEmbeddedInternalURL(for: .blocked)
@@ -68,7 +68,7 @@ extension URL {
     }
 
     if let internalUrl = InternalURL(self),
-      internalUrl.isSessionRestore || internalUrl.isWeb3URL || internalUrl.isHTTPBlockedPage
+      internalUrl.isWeb3URL || internalUrl.isHTTPBlockedPage
         || internalUrl.isBlockedPage
     {
       return internalUrl.extractedUrlParam?.displayURL
@@ -253,6 +253,26 @@ extension URL {
 
     return true
   }
+
+  public static func uniqueFileName(_ filename: String, in folder: URL) async throws -> URL {
+    let basePath = folder.appending(path: filename)
+    let fileExtension = basePath.pathExtension
+    let filenameWithoutExtension =
+      !fileExtension.isEmpty ? String(filename.dropLast(fileExtension.count + 1)) : filename
+
+    var proposedPath = basePath
+    var count = 0
+
+    while await AsyncFileManager.default.fileExists(atPath: proposedPath.path) {
+      count += 1
+
+      let proposedFilenameWithoutExtension = "\(filenameWithoutExtension) (\(count))"
+      proposedPath = folder.appending(path: proposedFilenameWithoutExtension)
+        .appending(path: fileExtension)
+    }
+
+    return proposedPath
+  }
 }
 
 extension InternalURL {
@@ -260,7 +280,6 @@ extension InternalURL {
   enum URLType {
     case blockedPage
     case httpBlockedPage
-    case sessionRestorePage
     case errorPage
     case readerModePage
     case aboutHomePage
@@ -290,10 +309,6 @@ extension InternalURL {
 
     if isReaderModePage {
       return .readerModePage
-    }
-
-    if isSessionRestore {
-      return .sessionRestorePage
     }
 
     if isAboutHomeURL {

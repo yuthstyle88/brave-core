@@ -92,7 +92,7 @@ hooks = [
     'condition': 'checkout_mac',
     'action': ['vpython3', 'build/download_dep.py',
                'omaha4/BraveUpdater-132.1.76.11.zip',
-               '//build/mac_files/omaha4'],
+               '//third_party/updater/chrome_mac_universal_prod/cipd'],
   },
   {
     'name': 'update_pip',
@@ -175,6 +175,11 @@ hooks = [
     'pattern': '.',
     "condition": 'checkout_mac and host_os != "mac" and checkout_dmg_tool',
     'action': ['build/mac/cross-compile/build-libdmg-hfsplus.py', 'third_party/libdmg-hfsplus']
+  },
+  {
+    'name': 'download_rust_toolchain_aux',
+    'pattern': '.',
+    'action': ['python3', 'build/rust/download_rust_toolchain_aux.py']
   },
 ]
 

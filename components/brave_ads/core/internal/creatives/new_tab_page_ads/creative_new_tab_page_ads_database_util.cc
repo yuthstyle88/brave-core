@@ -15,15 +15,25 @@
 #include "brave/components/brave_ads/core/internal/common/logging_util.h"
 #include "brave/components/brave_ads/core/internal/creatives/conversions/creative_set_conversion_database_table_util.h"
 #include "brave/components/brave_ads/core/internal/creatives/conversions/creative_set_conversion_info.h"
+#include "brave/components/brave_ads/core/internal/creatives/new_tab_page_ads/creative_new_tab_page_ad_wallpaper_type_constants.h"
+#include "brave/components/brave_ads/core/internal/creatives/new_tab_page_ads/creative_new_tab_page_ad_wallpaper_type_util.h"
 #include "brave/components/brave_ads/core/internal/creatives/new_tab_page_ads/creative_new_tab_page_ads_database_table.h"
 #include "brave/components/brave_ads/core/internal/segments/segment_constants.h"
+#include "brave/components/brave_ads/core/public/common/url/url_util.h"
 
 namespace brave_ads::database {
 
 namespace {
 
+// Schema keys.
+constexpr int kExpectedSchemaVersion = 2;
+inline constexpr char kSchemaVersionKey[] = "schemaVersion";
+
 // Campaign keys.
+constexpr int kExpectedCampaignVersion = 1;
+
 constexpr char kCampaignsKey[] = "campaigns";
+constexpr char kCampaignVersionKey[] = "version";
 constexpr char kCampaignIdKey[] = "campaignId";
 
 constexpr char kCampaignAdvertiserIdKey[] = "advertiserId";
@@ -68,6 +78,9 @@ constexpr char kCreativeSetConversionPublicKeyKey[] = "publicKey";
 constexpr char kCreativesKey[] = "creatives";
 constexpr char kCreativeInstanceIdKey[] = "creativeInstanceId";
 
+constexpr char kCreativeWallpaperKey[] = "wallpaper";
+constexpr char kCreativeWallpaperTypeKey[] = "type";
+
 constexpr char kCreativeCompanyNameKey[] = "companyName";
 constexpr char kCreativeAltKey[] = "alt";
 
@@ -82,8 +95,14 @@ constexpr char kCreativeConditionMatcherPrefPathKey[] = "prefPath";
 // This temporary implementation has high congitive complexity to parse and save
 // creative new tab page ads. It will be replaced when new tab page ads are
 // served from the ads component.
-bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
-  const base::Value::List* const campaign_list = data.FindList(kCampaignsKey);
+bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict dict) {
+  const std::optional<int> schema_version = dict.FindInt(kSchemaVersionKey);
+  if (schema_version != kExpectedSchemaVersion) {
+    // Currently, only version 2 is supported. Update this code to maintain.
+    return false;
+  }
+
+  const base::Value::List* const campaign_list = dict.FindList(kCampaignsKey);
   if (!campaign_list) {
     BLOG(0, "Campaigns are required");
     return false;
@@ -102,6 +121,14 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
       continue;
     }
 
+    const std::optional<int> campaign_version =
+        campaign_dict->FindInt(kCampaignVersionKey);
+    if (campaign_version != kExpectedCampaignVersion) {
+      // Currently, only version 1 is supported. Update this code to maintain
+      // backwards compatibility when adding new schema versions.
+      continue;
+    }
+
     const std::string* const campaign_id =
         campaign_dict->FindString(kCampaignIdKey);
     if (!campaign_id) {
@@ -113,7 +140,6 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
     const std::string* const advertiser_id =
         campaign_dict->FindString(kCampaignAdvertiserIdKey);
     if (!advertiser_id) {
-      // Advertiser ID is required.
       BLOG(0, "Advertiser ID is required, skipping campaign");
       continue;
     }
@@ -148,7 +174,7 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
         campaign_dict->FindInt(kCampaignDailyCapKey).value_or(0);
 
     creative_ad.priority =
-        campaign_dict->FindInt(kCampaignPriorityKey).value_or(0);
+        campaign_dict->FindInt(kCampaignPriorityKey).value_or(10);
 
     creative_ad.pass_through_rate =
         campaign_dict->FindInt(kCampaignPassThroughRateKey).value_or(1.0);
@@ -157,7 +183,6 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
     const base::Value::List* const geo_target_list =
         campaign_dict->FindList(kCampaignGeoTargetsKey);
     if (!geo_target_list || geo_target_list->empty()) {
-      // Geo targets are required.
       BLOG(0, "Geo targets are required, skipping campaign");
       continue;
     }
@@ -189,7 +214,6 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
         const std::string* const days_of_week =
             daypart_dict->FindString(kCampaignDayPartDaysOfWeekKey);
         if (!days_of_week) {
-          // Days of week is required.
           BLOG(0, "Days of week is required, skipping campaign");
           continue;
         }
@@ -217,7 +241,6 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
     const base::Value::List* const creative_set_list =
         campaign_dict->FindList(kCreativeSetsKey);
     if (!creative_set_list) {
-      // Creative sets are required.
       BLOG(0, "Creative sets are required, skipping campaign");
       continue;
     }
@@ -234,7 +257,6 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
       const std::string* const creative_set_id =
           creative_set_dict->FindString(kCreativeSetIdKey);
       if (!creative_set_id) {
-        // Creative set ID is required.
         BLOG(0, "Creative set ID is required, skipping creative set");
         continue;
       }
@@ -340,7 +362,6 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
       const base::Value::List* const creative_list =
           creative_set_dict->FindList(kCreativesKey);
       if (!creative_list) {
-        // Creatives are required.
         BLOG(0, "Creatives are required, skipping creative set");
         continue;
       }
@@ -357,7 +378,6 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
         const std::string* const creative_instance_id =
             creative_dict->FindString(kCreativeInstanceIdKey);
         if (!creative_instance_id) {
-          // Creative instance ID is required.
           BLOG(0, "Creative instance ID is required, skipping creative");
           continue;
         }
@@ -366,7 +386,6 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
         const std::string* const company_name =
             creative_dict->FindString(kCreativeCompanyNameKey);
         if (!company_name) {
-          // Company name is required.
           BLOG(0, "Company name is required, skipping creative");
           continue;
         }
@@ -375,7 +394,6 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
         const std::string* const alt =
             creative_dict->FindString(kCreativeAltKey);
         if (!alt) {
-          // Alt is required.
           BLOG(0, "Alt is required, skipping creative");
           continue;
         }
@@ -384,11 +402,36 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
         const std::string* const target_url =
             creative_dict->FindString(kCreativeTargetUrlKey);
         if (!target_url) {
-          // Target URL is required.
           BLOG(0, "Target URL is required, skipping creative");
           continue;
         }
         creative_ad.target_url = GURL(*target_url);
+        if (!ShouldSupportUrl(creative_ad.target_url)) {
+          BLOG(0, "Invalid target URL, skipping creative");
+          continue;
+        }
+
+        // Wallpaper.
+        const base::Value::Dict* const wallpaper_dict =
+            creative_dict->FindDict(kCreativeWallpaperKey);
+        if (!wallpaper_dict) {
+          BLOG(0, "Wallpaper is required, skipping creative");
+          continue;
+        }
+
+        const std::string* const wallpaper_type =
+            wallpaper_dict->FindString(kCreativeWallpaperTypeKey);
+        if (!wallpaper_type) {
+          BLOG(0, "Wallpaper type is required, skipping creative");
+          continue;
+        }
+        if (*wallpaper_type != kCreativeNewTabPageAdImageWallpaperType &&
+            *wallpaper_type != kCreativeNewTabPageAdRichMediaWallpaperType) {
+          BLOG(0, "Unknown wallpaper type, skipping creative");
+          continue;
+        }
+        creative_ad.wallpaper_type =
+            ToCreativeNewTabPageAdWallpaperType(*wallpaper_type);
 
         // Condition matchers.
         const base::Value::List* const condition_matcher_list =
@@ -408,7 +451,6 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
                 condition_matcher_dict->FindString(
                     kCreativeConditionMatcherConditionKey);
             if (!condition) {
-              // Condition is required.
               BLOG(0, "Condition is required, skipping condition matcher");
               continue;
             }
@@ -417,7 +459,6 @@ bool ParseAndSaveCreativeNewTabPageAds(base::Value::Dict data) {
                 condition_matcher_dict->FindString(
                     kCreativeConditionMatcherPrefPathKey);
             if (!pref_path) {
-              // Pref path is required.
               BLOG(0, "Pref path is required, skipping condition matcher");
               continue;
             }

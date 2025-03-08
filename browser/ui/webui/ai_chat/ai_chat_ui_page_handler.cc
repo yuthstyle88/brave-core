@@ -14,6 +14,8 @@
 #include "base/functional/callback_forward.h"
 #include "brave/browser/ai_chat/ai_chat_service_factory.h"
 #include "brave/browser/ai_chat/ai_chat_urls.h"
+#include "brave/browser/brave_browser_process.h"
+#include "brave/browser/misc_metrics/process_misc_metrics.h"
 #include "brave/browser/ui/side_panel/ai_chat/ai_chat_side_panel_utils.h"
 #include "brave/components/ai_chat/core/browser/ai_chat_service.h"
 #include "brave/components/ai_chat/core/browser/constants.h"
@@ -24,6 +26,7 @@
 #include "chrome/browser/favicon/favicon_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_finder.h"
+#include "chrome/browser/ui/chrome_select_file_policy.h"
 #include "chrome/browser/ui/singleton_tabs.h"
 #include "chrome/browser/ui/tabs/public/tab_interface.h"
 #include "components/favicon/core/favicon_service.h"
@@ -43,7 +46,6 @@
 #endif
 
 namespace {
-constexpr uint32_t kDesiredFaviconSizePixels = 32;
 constexpr char kURLRefreshPremiumSession[] =
     "https://account.brave.com/?intent=recover&product=leo";
 constexpr char kURLLearnMoreAboutStorage[] =
@@ -137,13 +139,18 @@ AIChatUIPageHandler::AIChatUIPageHandler(
     mojo::PendingReceiver<ai_chat::mojom::AIChatUIHandler> receiver)
     : owner_web_contents_(owner_web_contents),
       profile_(profile),
+      ai_chat_metrics_(
+          g_brave_browser_process->process_misc_metrics()->ai_chat_metrics()),
       receiver_(this, std::move(receiver)) {
   // Standalone mode means Chat is opened as its own tab in the tab strip and
   // not a side panel. chat_context_web_contents is nullptr in that case
-  favicon_service_ = FaviconServiceFactory::GetForProfile(
-      profile_, ServiceAccessType::EXPLICIT_ACCESS);
   const bool is_standalone = chat_context_web_contents == nullptr;
   if (!is_standalone) {
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+    if (ai_chat_metrics_) {
+      ai_chat_metrics_->RecordSidebarUsage();
+    }
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
     active_chat_tab_helper_ =
         ai_chat::AIChatTabHelper::FromWebContents(chat_context_web_contents);
     chat_tab_helper_observation_.Observe(active_chat_tab_helper_);
@@ -165,6 +172,17 @@ void AIChatUIPageHandler::ShowSoftKeyboard() {
 #if BUILDFLAG(IS_ANDROID)
   ai_chat::HandleShowSoftKeyboard(owner_web_contents_.get());
 #endif
+}
+
+void AIChatUIPageHandler::UploadImage(const std::string& conversation_uuid,
+                                      UploadImageCallback callback) {
+  if (!upload_file_helper_) {
+    upload_file_helper_ =
+        std::make_unique<UploadFileHelper>(owner_web_contents_, profile_);
+  }
+  upload_file_helper_->UploadImage(
+      std::make_unique<ChromeSelectFilePolicy>(owner_web_contents_),
+      std::move(callback));
 }
 
 void AIChatUIPageHandler::OpenAIChatSettings() {
@@ -190,6 +208,11 @@ void AIChatUIPageHandler::OpenConversationFullPage(
     const std::string& conversation_uuid) {
   CHECK(ai_chat::features::IsAIChatHistoryEnabled());
   CHECK(active_chat_tab_helper_);
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+  if (ai_chat_metrics_) {
+    ai_chat_metrics_->RecordFullPageSwitch();
+  }
+#endif
   active_chat_tab_helper_->web_contents()->OpenURL(
       {
           ConversationUrl(conversation_uuid),
@@ -362,56 +385,9 @@ void AIChatUIPageHandler::NewConversation(
   conversation->Bind(std::move(receiver), std::move(conversation_ui_handler));
 }
 
-void AIChatUIPageHandler::GetFaviconImageData(
-    const std::string& conversation_id,
-    GetFaviconImageDataCallback callback) {
-  ConversationHandler* conversation =
-      AIChatServiceFactory::GetForBrowserContext(profile_)->GetConversation(
-          conversation_id);
-  if (!conversation) {
-    std::move(callback).Run(std::nullopt);
-    return;
-  }
-
-  conversation->GetAssociatedContentInfo(base::BindOnce(
-      &AIChatUIPageHandler::GetFaviconImageDataForAssociatedContent,
-      weak_ptr_factory_.GetWeakPtr(), std::move(callback)));
-}
-
 void AIChatUIPageHandler::BindParentUIFrameFromChildFrame(
     mojo::PendingReceiver<mojom::ParentUIFrame> receiver) {
   chat_ui_->OnChildFrameBound(std::move(receiver));
-}
-
-void AIChatUIPageHandler::GetFaviconImageDataForAssociatedContent(
-    GetFaviconImageDataCallback callback,
-    mojom::SiteInfoPtr content_info,
-    bool should_send_page_contents) {
-  if (!content_info->is_content_association_possible ||
-      !content_info->url.has_value() || !content_info->url->is_valid()) {
-    std::move(callback).Run(std::nullopt);
-    return;
-  }
-  favicon_base::IconTypeSet icon_types{favicon_base::IconType::kFavicon,
-                                       favicon_base::IconType::kTouchIcon};
-
-  auto on_favicon_available =
-      [](GetFaviconImageDataCallback callback,
-         const favicon_base::FaviconRawBitmapResult& result) {
-        if (!result.is_valid()) {
-          std::move(callback).Run(std::nullopt);
-          return;
-        }
-
-        std::vector<uint8_t> bytes(result.bitmap_data->begin(),
-                                   result.bitmap_data->end());
-        std::move(callback).Run(std::move(bytes));
-      };
-
-  favicon_service_->GetRawFaviconForPageURL(
-      content_info->url.value(), icon_types, kDesiredFaviconSizePixels, true,
-      base::BindOnce(on_favicon_available, std::move(callback)),
-      &favicon_task_tracker_);
 }
 
 }  // namespace ai_chat
