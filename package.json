@@ -72,7 +72,7 @@
         "dir": "src",
         "tag": "134.0.6998.24",
         "repository": {
-          "url": "https://github.com/yuthstyle88/chromium"
+          "url": "https://github.com/brave/chromium"
         }
       },
       "depot_tools": {
